@@ -22,4 +22,5 @@ npx pm2 logs
 check whats run :
 ```bash
 npx pm2 list
+npx pm2 monit
 ```
