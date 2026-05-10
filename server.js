@@ -69,6 +69,10 @@ app.all("/proxy", async (req, res) => {
       }
     }
 
+    if (req.headers["x-forward-user-agent"]) {
+      forwardHeaders["user-agent"] = req.headers["x-forward-user-agent"];
+    }
+
     let body;
     if (!["GET", "HEAD"].includes(req.method)) {
       if (Buffer.isBuffer(req.body) && req.body.length > 0) {
