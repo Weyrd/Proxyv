@@ -25,6 +25,14 @@ const HOP_BY_HOP_HEADERS = new Set([
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use((err, req, res, next) => {
+  if (err.type === "entity.parse.failed") {
+    req.body = undefined;
+    next();
+  } else {
+    next(err);
+  }
+});
 app.use(express.raw({ type: "*/*", limit: "10mb" }));
 app.use(rateLimit({ windowMs: 60 * 1000, max: 120 }));
 

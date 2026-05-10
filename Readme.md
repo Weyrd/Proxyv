@@ -16,6 +16,7 @@ check logs:
 
 ```bash
 npx pm2 logs
+ npx pm2 logs cors-proxy --lines 20
 ```
 
 
