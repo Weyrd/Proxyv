@@ -6,8 +6,15 @@ const rateLimit = require("express-rate-limit");
 const app = express();
 const PORT = process.env.PORT || 5657;
 const SECRET_HEADER_KEY = process.env.SECRET_KEY || "your-super-secret-key";
+const DEBUG = process.env.DEBUG === "true" || false; // set DEBUG=true in .env to enable logs
 
-// Fix trust proxy warning from express-rate-limit
+const log = (...args) => {
+  if (DEBUG) console.log(...args);
+};
+const logErr = (...args) => {
+  console.error(...args);
+}; // errors always shown
+
 app.set("trust proxy", 1);
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -20,7 +27,7 @@ const HOP_BY_HOP_HEADERS = new Set([
   "transfer-encoding",
   "upgrade",
   "x-proxy-auth",
-  "content-encoding", // strip — we send decompressed data
+  "content-encoding",
 ]);
 
 app.use(cors({ origin: true, credentials: true }));
@@ -68,7 +75,7 @@ app.all("/proxy", async (req, res) => {
 
     const forwardHeaders = {
       "user-agent": req.headers["user-agent"] || "proxy",
-      "accept-encoding": "gzip, deflate", // no br — Node fetch can't decompress it
+      "accept-encoding": "gzip, deflate",
     };
 
     for (const [key, value] of Object.entries(req.headers)) {
@@ -104,12 +111,9 @@ app.all("/proxy", async (req, res) => {
       redirect: "manual",
     });
 
-    console.log(`[PROXY] ${req.method} ${targetUrl}`);
-    console.log(`[PROXY] Status: ${response.status}`);
-    console.log(
-      `[PROXY] Headers:`,
-      Object.fromEntries(response.headers.entries()),
-    );
+    log(`[PROXY] ${req.method} ${targetUrl}`);
+    log(`[PROXY] Status: ${response.status}`);
+    log(`[PROXY] Headers:`, Object.fromEntries(response.headers.entries()));
 
     res.status(response.status);
 
@@ -130,23 +134,23 @@ app.all("/proxy", async (req, res) => {
     if (contentType.includes("application/json")) {
       try {
         const json = await response.json();
-        console.log(`[PROXY] JSON OK`);
+        log(`[PROXY] JSON OK`);
         return res.json(json);
       } catch (e) {
         const text = await response.text();
-        console.error(`[PROXY] JSON parse failed, raw:`, text.slice(0, 200));
+        logErr(`[PROXY] JSON parse failed, raw:`, text.slice(0, 200));
         res.setHeader("Content-Type", "application/json");
         return res.send(text);
       }
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
-    console.log(
+    log(
       `[PROXY] Binary/text response, ${buffer.length} bytes, type: ${contentType}`,
     );
     return res.send(buffer);
   } catch (err) {
-    console.error("[PROXY] Error:", err);
+    logErr("[PROXY] Error:", err);
     res.status(500).json({ error: "Proxy failed", detail: err.message });
   }
 });

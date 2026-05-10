@@ -5,6 +5,7 @@ create .env with :
 ```env
 PORT=5657
 SECRET_KEY=...
+DEBUG=true
 ```
 
 Start :
