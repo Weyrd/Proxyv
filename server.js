@@ -141,10 +141,6 @@ app.all("/proxy", async (req, res) => {
     for (const [key, value] of response.headers.entries()) {
       const lowerKey = key.toLowerCase();
 
-      // Node fetch already decompressed the body.
-      // Do NOT forward compression metadata.
-     const lowerKey = key.toLowerCase();
-
       if (
         lowerKey === "content-encoding" ||
         lowerKey === "content-length" ||
