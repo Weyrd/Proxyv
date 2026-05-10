@@ -16,8 +16,9 @@ npx pm2 restart cors-proxy
 check logs:
 
 ```bash
+npx pm2 flush cors-proxy
 npx pm2 logs
- npx pm2 logs cors-proxy --lines 20
+npx pm2 logs cors-proxy --lines 20
 ```
 
 
