@@ -61,7 +61,7 @@ app.all("/proxy", async (req, res) => {
     const forwardHeaders = {
       "user-agent": req.headers["user-agent"] || "proxy",
       // Tell the remote server we accept gzip — Node's fetch will auto-decompress
-      "accept-encoding": "gzip, deflate, br",
+      "accept-encoding": "gzip, deflate",
     };
 
     // Forward any extra headers the client sent (Authorization, cookies, etc.)
