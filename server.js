@@ -123,8 +123,9 @@ app.all("/proxy", async (req, res) => {
       return res.json(json);
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    return res.send(buffer);
+    const text = await response.text();
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.send(text);
   } catch (err) {
     console.error("Proxy error:", err);
     res.status(500).json({ error: "Proxy failed" });
