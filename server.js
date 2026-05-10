@@ -7,6 +7,9 @@ const app = express();
 const PORT = process.env.PORT || 5657;
 const SECRET_HEADER_KEY = process.env.SECRET_KEY || "your-super-secret-key";
 
+// Fix trust proxy warning from express-rate-limit
+app.set("trust proxy", 1);
+
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -17,14 +20,12 @@ const HOP_BY_HOP_HEADERS = new Set([
   "transfer-encoding",
   "upgrade",
   "x-proxy-auth",
-  // Also strip content-encoding — we're sending decompressed data
-  "content-encoding",
+  "content-encoding", // strip — we send decompressed data
 ]);
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.raw({ type: "*/*", limit: "10mb" }));
-
 app.use(rateLimit({ windowMs: 60 * 1000, max: 120 }));
 
 app.get("/health", (req, res) => {
@@ -49,29 +50,25 @@ app.all("/proxy", async (req, res) => {
   }
 
   try {
-    // Build forwarded headers — pass through what the client sent
-    // but strip proxy-specific ones
     const skipOnForward = new Set([
       "host",
       "x-proxy-auth",
       "connection",
       "content-length",
+      "accept-encoding",
     ]);
 
     const forwardHeaders = {
       "user-agent": req.headers["user-agent"] || "proxy",
-      // Tell the remote server we accept gzip — Node's fetch will auto-decompress
-      "accept-encoding": "gzip, deflate",
+      "accept-encoding": "gzip, deflate", // no br — Node fetch can't decompress it
     };
 
-    // Forward any extra headers the client sent (Authorization, cookies, etc.)
     for (const [key, value] of Object.entries(req.headers)) {
       if (!skipOnForward.has(key.toLowerCase())) {
         forwardHeaders[key] = value;
       }
     }
 
-    // Forward body for POST/PUT/PATCH
     let body;
     if (!["GET", "HEAD"].includes(req.method)) {
       if (Buffer.isBuffer(req.body) && req.body.length > 0) {
@@ -88,7 +85,6 @@ app.all("/proxy", async (req, res) => {
       }
     }
 
-    // Node 22+ fetch auto-decompresses gzip/br when accept-encoding is set
     const response = await fetch(targetUrl, {
       method: req.method,
       headers: forwardHeaders,
@@ -96,22 +92,18 @@ app.all("/proxy", async (req, res) => {
       redirect: "manual",
     });
 
-    // ADD THIS BLOCK right after the fetch
     console.log(`[PROXY] ${req.method} ${targetUrl}`);
-    console.log(`[PROXY] Response status: ${response.status}`);
+    console.log(`[PROXY] Status: ${response.status}`);
     console.log(
-      `[PROXY] Response headers:`,
+      `[PROXY] Headers:`,
       Object.fromEntries(response.headers.entries()),
     );
 
     res.status(response.status);
 
-    // Forward response headers — skip hop-by-hop and content-encoding
-    // (since fetch already decompressed the body for us)
     response.headers.forEach((value, key) => {
       const k = key.toLowerCase();
       if (HOP_BY_HOP_HEADERS.has(k)) return;
-
       if (k === "set-cookie") {
         res.append("set-cookie", value);
       } else {
@@ -121,27 +113,28 @@ app.all("/proxy", async (req, res) => {
 
     res.setHeader("Access-Control-Expose-Headers", "*");
 
-    // Get the decompressed text/buffer from fetch
     const contentType = response.headers.get("content-type") || "";
 
     if (contentType.includes("application/json")) {
-      // Safe: fetch already decompressed, parse and re-serialize cleanly
       try {
         const json = await response.json();
+        console.log(`[PROXY] JSON OK`);
         return res.json(json);
-      } catch {
-        // If JSON parse fails, fall through to raw send
+      } catch (e) {
         const text = await response.text();
+        console.error(`[PROXY] JSON parse failed, raw:`, text.slice(0, 200));
         res.setHeader("Content-Type", "application/json");
         return res.send(text);
       }
     }
 
-    // For everything else (images, HTML, binary), send the decompressed buffer
     const buffer = Buffer.from(await response.arrayBuffer());
+    console.log(
+      `[PROXY] Binary/text response, ${buffer.length} bytes, type: ${contentType}`,
+    );
     return res.send(buffer);
   } catch (err) {
-    console.error("Proxy error:", err);
+    console.error("[PROXY] Error:", err);
     res.status(500).json({ error: "Proxy failed", detail: err.message });
   }
 });
