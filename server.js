@@ -88,13 +88,21 @@ app.all("/proxy", async (req, res) => {
       }
     }
 
-    // Node 18+ fetch auto-decompresses gzip/br when accept-encoding is set
+    // Node 22+ fetch auto-decompresses gzip/br when accept-encoding is set
     const response = await fetch(targetUrl, {
       method: req.method,
       headers: forwardHeaders,
       body,
       redirect: "manual",
     });
+
+    // ADD THIS BLOCK right after the fetch
+    console.log(`[PROXY] ${req.method} ${targetUrl}`);
+    console.log(`[PROXY] Response status: ${response.status}`);
+    console.log(
+      `[PROXY] Response headers:`,
+      Object.fromEntries(response.headers.entries()),
+    );
 
     res.status(response.status);
 
