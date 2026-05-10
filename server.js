@@ -126,7 +126,6 @@ app.all("/proxy", async (req, res) => {
     const buffer = Buffer.from(await response.arrayBuffer());
 
     // DO NOT force JSON
-    const contentType = response.headers.get("content-type");
 
     if (contentType) {
       res.setHeader("Content-Type", contentType);
