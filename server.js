@@ -139,12 +139,22 @@ app.all("/proxy", async (req, res) => {
 
     // Headers (including cookies)
     for (const [key, value] of response.headers.entries()) {
-      if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
-        if (key.toLowerCase() === "set-cookie") {
-          res.append("set-cookie", value);
-        } else {
-          res.setHeader(key, value);
-        }
+      const lowerKey = key.toLowerCase();
+
+      // Node fetch already decompressed the body.
+      // Do NOT forward compression metadata.
+      if (lowerKey === "content-encoding" || lowerKey === "content-length") {
+        continue;
+      }
+
+      if (HOP_BY_HOP_HEADERS.has(lowerKey)) {
+        continue;
+      }
+
+      if (lowerKey === "set-cookie") {
+        res.append("set-cookie", value);
+      } else {
+        res.setHeader(key, value);
       }
     }
 
