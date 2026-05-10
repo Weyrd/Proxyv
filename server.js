@@ -123,9 +123,17 @@ app.all("/proxy", async (req, res) => {
       return res.json(json);
     }
 
-    const text = await response.text();
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.send(text);
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    // DO NOT force JSON
+    const contentType = response.headers.get("content-type");
+
+    if (contentType) {
+      res.setHeader("Content-Type", contentType);
+    }
+
+    // send raw buffer ALWAYS
+    return res.send(buffer);
   } catch (err) {
     console.error("Proxy error:", err);
     res.status(500).json({ error: "Proxy failed" });
